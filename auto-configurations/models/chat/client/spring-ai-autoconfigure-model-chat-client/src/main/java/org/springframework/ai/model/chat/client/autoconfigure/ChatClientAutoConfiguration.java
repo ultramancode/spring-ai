@@ -28,6 +28,7 @@ import org.springframework.ai.chat.client.ChatClientCustomizer;
 import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor;
 import org.springframework.ai.chat.client.advisor.observation.AdvisorObservationConvention;
 import org.springframework.ai.chat.client.observation.ChatClientCompletionObservationHandler;
+import org.springframework.ai.chat.client.observation.ChatClientMetadataPropagationObservationFilter;
 import org.springframework.ai.chat.client.observation.ChatClientObservationContext;
 import org.springframework.ai.chat.client.observation.ChatClientObservationConvention;
 import org.springframework.ai.chat.client.observation.ChatClientPromptContentObservationHandler;
@@ -62,6 +63,7 @@ import org.springframework.context.annotation.Scope;
  * @author Arjen Poutsma
  * @author Thomas Vitale
  * @author Jonatan Ivanov
+ * @author Taewoong Kim
  * @since 1.0.0
  */
 @AutoConfiguration(after = ToolCallingAutoConfiguration.class)
@@ -81,6 +83,11 @@ public class ChatClientAutoConfiguration {
 	private static void logCompletionWarning() {
 		logger.warn(
 				"You have enabled logging out the ChatClient completion content with the risk of exposing sensitive or private information. Please, be careful!");
+	}
+
+	private static void logMetadataPropagationWarning() {
+		logger.warn(
+				"You have enabled propagation of selected ChatClient context metadata to observations, with the risk of exposing sensitive or private information and increasing trace payload size. Please, be careful!");
 	}
 
 	@Bean
@@ -126,6 +133,19 @@ public class ChatClientAutoConfiguration {
 			builder.defaultAdvisors(AdvisorParams.toolCallingAdvisorAutoRegister(false));
 		}
 		return chatClientBuilderConfigurer.configure(builder);
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	@ConditionalOnProperty(prefix = ChatClientBuilderProperties.CONFIG_PREFIX + ".observations.metadata-propagation",
+			name = "enabled", havingValue = "true")
+	ChatClientMetadataPropagationObservationFilter chatClientMetadataPropagationObservationFilter(
+			ChatClientBuilderProperties properties) {
+		logMetadataPropagationWarning();
+		ChatClientBuilderProperties.MetadataPropagation metadataPropagation = properties.getObservations()
+			.getMetadataPropagation();
+		return new ChatClientMetadataPropagationObservationFilter(metadataPropagation.getIncludeKeys(),
+				metadataPropagation.getMaxValueLength());
 	}
 
 	@Configuration(proxyBeanMethods = false)

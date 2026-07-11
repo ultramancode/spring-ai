@@ -16,6 +16,8 @@
 
 package org.springframework.ai.model.chat.client.autoconfigure;
 
+import java.util.List;
+
 import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -28,6 +30,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @author Arjen Poutsma
  * @author Thomas Vitale
  * @author Jonatan Ivanov
+ * @author Taewoong Kim
  * @since 1.0.0
  */
 @ConfigurationProperties(ChatClientBuilderProperties.CONFIG_PREFIX)
@@ -108,6 +111,8 @@ public class ChatClientBuilderProperties {
 		 */
 		private boolean logCompletion = false;
 
+		private final MetadataPropagation metadataPropagation = new MetadataPropagation();
+
 		public boolean isLogPrompt() {
 			return this.logPrompt;
 		}
@@ -130,6 +135,65 @@ public class ChatClientBuilderProperties {
 		 */
 		public void setLogCompletion(boolean logCompletion) {
 			this.logCompletion = logCompletion;
+		}
+
+		/**
+		 * @return the metadata propagation configuration
+		 * @since 2.0.1
+		 */
+		public MetadataPropagation getMetadataPropagation() {
+			return this.metadataPropagation;
+		}
+
+	}
+
+	/**
+	 * Configuration properties for propagating chat client context metadata to
+	 * observations.
+	 *
+	 * @since 2.0.1
+	 */
+	public static class MetadataPropagation {
+
+		/**
+		 * Whether to propagate selected chat client context entries to chat client and
+		 * nested chat model observations.
+		 */
+		private boolean enabled = false;
+
+		/**
+		 * Chat client context keys to propagate. Keys must match exactly.
+		 */
+		private List<String> includeKeys = List.of();
+
+		/**
+		 * Maximum length of propagated context values. Longer values are truncated. Must
+		 * be greater than zero.
+		 */
+		private int maxValueLength = 256;
+
+		public boolean isEnabled() {
+			return this.enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public List<String> getIncludeKeys() {
+			return this.includeKeys;
+		}
+
+		public void setIncludeKeys(List<String> includeKeys) {
+			this.includeKeys = includeKeys;
+		}
+
+		public int getMaxValueLength() {
+			return this.maxValueLength;
+		}
+
+		public void setMaxValueLength(int maxValueLength) {
+			this.maxValueLength = maxValueLength;
 		}
 
 	}

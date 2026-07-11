@@ -50,6 +50,39 @@ Spring AI supports logging the prompt and completion data to help with debugging
 
 WARNING: If you enable logging of the chat client prompt and completion data, there's a risk of exposing sensitive or private information. Please, be careful!
 
+=== Metadata Propagation
+
+ChatClient advisors can add contextual metadata to the `ChatClientRequest` context.
+Spring AI can propagate selected context entries to chat client observations and nested chat model observations.
+This is useful for correlating a model call with prompt versions, experiment variants, guardrail results, or other application-specific workflow metadata.
+
+[source,properties]
+----
+spring.ai.chat.client.observations.metadata-propagation.enabled=true
+spring.ai.chat.client.observations.metadata-propagation.include-keys=app.prompt.name,app.prompt.version
+----
+
+The configured entries are added as high-cardinality key-values before supported observations stop.
+Request entries can enrich the chat client observation and nested chat model observations invoked through the advisor chain.
+Response entries are available only to the enclosing chat client observation after successful completion.
+A non-null response value takes precedence over the request value for the same key, while existing observation key-values take precedence over propagated values.
+Null values are ignored, and other values are converted to strings and truncated to the configured maximum length.
+Advisor observations are not enriched, avoiding repeated attributes across the advisor chain.
+
+[cols="6,3,1", stripes=even]
+|====
+| Property | Description | Default
+
+| `spring.ai.chat.client.observations.metadata-propagation.enabled` | Whether to propagate selected chat client context entries to observations. | `false`
+| `spring.ai.chat.client.observations.metadata-propagation.include-keys` | Chat client context keys to propagate. Keys must match exactly. | `[]`
+| `spring.ai.chat.client.observations.metadata-propagation.max-value-length` | Maximum length of propagated context values. Longer values are truncated. Must be greater than zero. | `256`
+|====
+
+WARNING: If you enable metadata propagation, only include context keys that are safe to expose in tracing data.
+Metadata propagation does not create additional observations. Selected entries are copied only to chat client observations and eligible nested chat model observations.
+The default Micrometer meter handler does not use these high-cardinality key-values as meter tags.
+Keep the allowlist small and use compact values to limit processing and trace payload size.
+
 === Chat Client Advisors
 
 The `spring.ai.advisor` observations are recorded when an advisor is executed.

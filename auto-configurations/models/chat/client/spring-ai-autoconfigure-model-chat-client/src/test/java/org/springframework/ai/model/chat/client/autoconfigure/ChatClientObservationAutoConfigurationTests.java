@@ -16,11 +16,14 @@
 
 package org.springframework.ai.model.chat.client.autoconfigure;
 
+import java.util.List;
+
 import io.micrometer.tracing.Tracer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.ai.chat.client.observation.ChatClientCompletionObservationHandler;
+import org.springframework.ai.chat.client.observation.ChatClientMetadataPropagationObservationFilter;
 import org.springframework.ai.chat.client.observation.ChatClientObservationContext;
 import org.springframework.ai.chat.client.observation.ChatClientPromptContentObservationHandler;
 import org.springframework.ai.observation.TracingAwareLoggingObservationHandler;
@@ -41,6 +44,7 @@ import static org.mockito.Mockito.mock;
  * @author Christian Tzolov
  * @author Thomas Vitale
  * @author Jonatan Ivanov
+ * @author Taewoong Kim
  */
 @ExtendWith(OutputCaptureExtension.class)
 class ChatClientObservationAutoConfigurationTests {
@@ -62,6 +66,41 @@ class ChatClientObservationAutoConfigurationTests {
 			.run(context -> assertThat(context).doesNotHaveBean(ChatClientPromptContentObservationHandler.class)
 				.doesNotHaveBean(ChatClientCompletionObservationHandler.class)
 				.doesNotHaveBean(TracingAwareLoggingObservationHandler.class));
+	}
+
+	@Test
+	void metadataPropagationFilterDisabledByDefault() {
+		this.contextRunner
+			.run(context -> assertThat(context).doesNotHaveBean(ChatClientMetadataPropagationObservationFilter.class));
+	}
+
+	@Test
+	void metadataPropagationFilterEnabled(CapturedOutput output) {
+		this.contextRunner
+			.withPropertyValues("spring.ai.chat.client.observations.metadata-propagation.enabled=true",
+					"spring.ai.chat.client.observations.metadata-propagation.include-keys[0]=metadata.prompt.name",
+					"spring.ai.chat.client.observations.metadata-propagation.max-value-length=128")
+			.run(context -> {
+				assertThat(context).hasSingleBean(ChatClientMetadataPropagationObservationFilter.class);
+				ChatClientBuilderProperties.MetadataPropagation metadataPropagation = context
+					.getBean(ChatClientBuilderProperties.class)
+					.getObservations()
+					.getMetadataPropagation();
+				assertThat(metadataPropagation.isEnabled()).isTrue();
+				assertThat(metadataPropagation.getIncludeKeys()).containsExactly("metadata.prompt.name");
+				assertThat(metadataPropagation.getMaxValueLength()).isEqualTo(128);
+			});
+		assertThat(output).contains(
+				"You have enabled propagation of selected ChatClient context metadata to observations, with the risk of exposing sensitive or private information and increasing trace payload size. Please, be careful!");
+	}
+
+	@Test
+	void customMetadataPropagationFilterSuppressesAutoConfiguration() {
+		this.contextRunner.withUserConfiguration(CustomMetadataPropagationObservationFilterConfiguration.class)
+			.withPropertyValues("spring.ai.chat.client.observations.metadata-propagation.enabled=true",
+					"spring.ai.chat.client.observations.metadata-propagation.include-keys[0]=metadata.prompt.name")
+			.run(context -> assertThat(context).hasSingleBean(ChatClientMetadataPropagationObservationFilter.class)
+				.hasBean("customMetadataPropagationObservationFilter"));
 	}
 
 	@Test
@@ -226,6 +265,16 @@ class ChatClientObservationAutoConfigurationTests {
 		@Bean
 		Tracer tracer() {
 			return mock(Tracer.class);
+		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class CustomMetadataPropagationObservationFilterConfiguration {
+
+		@Bean
+		ChatClientMetadataPropagationObservationFilter customMetadataPropagationObservationFilter() {
+			return new ChatClientMetadataPropagationObservationFilter(List.of("custom.key"), 1);
 		}
 
 	}
